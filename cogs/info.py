@@ -8,7 +8,7 @@ RULE_TEXT = """新過去問DBのルール:
 3. 荒らし・誹謗中傷は禁止
 """
 
-INVITE_LINK = "https://discord.gg/xxxxxxx"  # 実際のリンクに差し替え
+INVITE_LINK = "https://discord.gg/kChZWPMQ8a"  # 実際のリンクに差し替え
 
 WELCOME_TEXT = """ようこそ新過去問DBへ!
 過去問を検索するには `/search` を使ってください。
