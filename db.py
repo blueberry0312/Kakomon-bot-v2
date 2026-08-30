@@ -109,6 +109,18 @@ async def latest_exams(limit=10):
         return [tuple(r) for r in rows]
 
 
+async def get_exam(exam_id):
+    """/report で指定されたIDの内容を1件取得する(存在しなければNone)"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT id, year, grade, department, subject, exam_type, file_url, submitted_by
+               FROM exams WHERE id = $1""",
+            exam_id,
+        )
+        return tuple(row) if row else None
+
+
 async def soft_delete_exam(exam_id):
     pool = await get_pool()
     async with pool.acquire() as conn:

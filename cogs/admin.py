@@ -1,8 +1,9 @@
+import os
 import discord
 from discord import app_commands
 from discord.ext import commands
 from db import (
-    init_db, add_exam, find_duplicate, soft_delete_exam, edit_exam,
+    init_db, add_exam, find_duplicate, soft_delete_exam, edit_exam, get_exam,
     EXAM_TYPES, DEPARTMENTS,
 )
 
@@ -10,6 +11,9 @@ from db import (
 # 「Contributor」ロール: 登録(/add)だけできる、有志に配りやすい弱い権限
 ADMIN_ROLE_NAME = "Admin"
 REGISTRAR_ROLE_NAME = "Contributor"
+
+# /report の通知先チャンネルID(Railwayの環境変数 REPORT_CHANNEL_ID で設定)
+REPORT_CHANNEL_ID = os.getenv("REPORT_CHANNEL_ID")
 
 
 def _has_role(interaction: discord.Interaction, role_name: str) -> bool:
@@ -139,13 +143,40 @@ class Admin(commands.Cog):
     @app_commands.command(name="report", description="著作権等の理由で過去問の削除を依頼します")
     @app_commands.describe(exam_id="削除依頼したい過去問のID", reason="削除理由")
     async def report(self, interaction: discord.Interaction, exam_id: int, reason: str):
-        # 管理者チャンネルに通知する想定(チャンネルIDは運用時に設定)
         await interaction.response.send_message(
             "削除依頼を受け付けました。管理者が確認します。ご協力ありがとうございます。",
             ephemeral=True,
         )
-        # TODO: 管理者用チャンネルへ exam_id / reason / 依頼者 を転送する処理を実装
-        print(f"[削除依頼] exam_id={exam_id} reason={reason} by={interaction.user}")
+
+        exam = await get_exam(exam_id)
+
+        embed = discord.Embed(title="🚩 削除依頼が届きました", color=discord.Color.red())
+        embed.add_field(name="対象ID", value=str(exam_id), inline=True)
+        if exam:
+            _, year, grade, department, subject, exam_type, file_url, submitted_by = exam
+            embed.add_field(name="内容", value=f"{year}年度 {subject} {exam_type}", inline=True)
+            embed.add_field(name="登録者", value=submitted_by or "不明", inline=True)
+            embed.add_field(name="ファイル", value=f"[リンク]({file_url})", inline=False)
+        else:
+            embed.add_field(name="内容", value="⚠️ 該当IDが見つかりませんでした(既に削除済みの可能性)", inline=False)
+        embed.add_field(name="理由", value=reason, inline=False)
+        embed.add_field(name="依頼者", value=str(interaction.user), inline=False)
+        embed.add_field(
+            name="対応方法",
+            value=f"問題があれば `/remove exam_id:{exam_id}` で削除してください。",
+            inline=False,
+        )
+
+        if REPORT_CHANNEL_ID:
+            channel = self.bot.get_channel(int(REPORT_CHANNEL_ID))
+            if channel:
+                await channel.send(embed=embed)
+            else:
+                print(f"[削除依頼] 通知先チャンネル(ID: {REPORT_CHANNEL_ID})が見つかりませんでした")
+                print(f"[削除依頼] exam_id={exam_id} reason={reason} by={interaction.user}")
+        else:
+            print("[削除依頼] REPORT_CHANNEL_IDが未設定のためコンソールにのみ出力します")
+            print(f"[削除依頼] exam_id={exam_id} reason={reason} by={interaction.user}")
 
 async def setup(bot: commands.Bot):
     cog = Admin(bot)
